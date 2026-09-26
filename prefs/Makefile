@@ -4,7 +4,6 @@ BUNDLE_NAME = StatusBarProPrefs
 StatusBarProPrefs_FILES = StatusBarProPrefsListController.m
 StatusBarProPrefs_INSTALL_PATH = /Library/PreferenceBundles
 StatusBarProPrefs_FRAMEWORKS = UIKit
-StatusBarProPrefs_PRIVATE_FRAMEWORKS = Preferences
 StatusBarProPrefs_CFLAGS = -fobjc-arc -Wno-unused-function
 StatusBarProPrefs_LDFLAGS = -Wl,-undefined,dynamic_lookup
 
