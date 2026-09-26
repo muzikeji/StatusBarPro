@@ -164,12 +164,12 @@ static NSTimer *gTimer = nil;
     if (!use24) h = h % 12 ?: 12;
     BOOL showSec = [SBPGetPref(@"showSeconds") boolValue];
     NSString *timeText = showSec
-        ? [NSString stringWithFormat:@"%02d:%02d:%02d", h, c.minute, c.second]
-        : [NSString stringWithFormat:@"%02d:%02d", h, c.minute];
+        ? [NSString stringWithFormat:@"%02d:%02d:%02d", h, (int)c.minute, (int)c.second]
+        : [NSString stringWithFormat:@"%02d:%02d", h, (int)c.minute];
 
     BOOL showDate = [SBPGetPref(@"showDate") boolValue];
     NSString *dateText = showDate
-        ? [NSString stringWithFormat:@"%04d-%02d-%02d", c.year, c.month, c.day]
+        ? [NSString stringWithFormat:@"%04d-%02d-%02d", (int)c.year, (int)c.month, (int)c.day]
         : @"";
 
     BOOL showWeek = [SBPGetPref(@"showWeekday") boolValue];
