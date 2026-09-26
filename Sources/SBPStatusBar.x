@@ -509,7 +509,8 @@ static void applyColorOverrides() {
 %end
 %end
 
-// 2) 图标重绘
+// 2) 图标重绘 (所有版本通用)
+%group SBPIcons
 %hook UIStatusBarImageView
 - (UIImage *)image {
     NSString *name = self.namedImageName ?: @"";
@@ -537,6 +538,7 @@ static void applyColorOverrides() {
     return %orig;
 }
 %end
+%end // SBPIcons
 
 // 3) 状态栏高度 (iOS 17 改 pixel layout)
 // iOS 15/16: UIStatusBar setFrame
@@ -558,6 +560,9 @@ static void reloadPrefs() {
 }
 
 %ctor {
+    // 图标 hook 在所有版本启用
+    %init(SBPIcons);
+
     // 按系统版本启用不同 group
     if (SBP_iOS17OrLater()) {
         %init(SBPNewTime);
