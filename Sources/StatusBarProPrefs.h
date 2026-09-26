@@ -93,13 +93,6 @@
 - (id)applyUpdate:(id)arg1 toDisplayItem:(id)arg2;
 @end
 
-@interface STUIStatusBarTimeItem : STUIStatusBarItem
-@property(nonatomic, retain) STUIStatusBarStringView *dateView;
-@property(nonatomic, retain) STUIStatusBarStringView *pillTimeView;
-@property(nonatomic, retain) STUIStatusBarStringView *shortTimeView;
-@property(nonatomic, retain) STUIStatusBarStringView *timeView;
-@end
-
 @interface STUIStatusBarStringView : UILabel
 @property(nonatomic, copy) NSString *alternateText;
 @property(nonatomic, readonly) NSTimer *alternateTextTimer;
@@ -108,6 +101,13 @@
 @property(nonatomic) bool showsAlternateText;
 - (void)applyStyleAttributes:(id)arg1;
 - (void)didMoveToWindow;
+@end
+
+@interface STUIStatusBarTimeItem : STUIStatusBarItem
+@property(nonatomic, retain) STUIStatusBarStringView *dateView;
+@property(nonatomic, retain) STUIStatusBarStringView *pillTimeView;
+@property(nonatomic, retain) STUIStatusBarStringView *shortTimeView;
+@property(nonatomic, retain) STUIStatusBarStringView *timeView;
 @end
 
 @interface STUIStatusBarSignalView : UIView
