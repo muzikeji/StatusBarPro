@@ -8,8 +8,18 @@
         <string>StatusBarProPrefs</string>
         <key>cell</key>
         <string>PSLinkCell</string>
+        <key>isController</key>
+        <true/>
         <key>label</key>
         <string>StatusBarPro</string>
+        <key>defaults</key>
+        <string>com.muzikeji.statusbarpro</string>
+        <key>icon</key>
+        <string>icon.png</string>
+        <key>icon@2x</key>
+        <string>Icon@2x.png</string>
+        <key>icon@3x</key>
+        <string>Icon@3x.png</string>
     </dict>
 </dict>
 </plist>

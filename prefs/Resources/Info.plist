@@ -1,8 +1,12 @@
 {
+	"title": "StatusBarPro",
+	"bundleId": "com.muzikeji.statusbarpro",
+	"version": "1.0.3",
+	"build": "1",
+	"minimumOSVersion": "14.0",
+	"CFBundleIconFiles": ["Icon"],
 	"CFBundleIdentifier": "com.muzikeji.statusbarpro.prefs",
 	"CFBundleName": "StatusBarPro",
-	"CFBundleDisplayName": "StatusBarPro",
-	"CFBundleVersion": "1.0.2",
-	"CFBundleShortVersionString": "1.0.2",
-	"CFBundlePackageType": "BNDL"
+	"CFBundleVersion": "1.0.3",
+	"CFBundleShortVersionString": "1.0.3"
 }
