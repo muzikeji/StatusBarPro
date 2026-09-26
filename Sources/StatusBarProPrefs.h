@@ -46,7 +46,7 @@
 @end
 
 @interface UIStatusBarStringView : UILabel
-@property(retain, nonatomic) NSString *text;
+@property(copy, nonatomic) NSString *text;
 @end
 
 #pragma mark - Generic Status Bar Infrastructure

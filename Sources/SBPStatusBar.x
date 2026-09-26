@@ -1,8 +1,5 @@
 #import "SBPHeader.h"
 #import "StatusBarProPrefs.h"
-#import <CoreTelephony/CoreTelephony.h>
-#import <AVFoundation/AVFoundation.h>
-#import <QuartzCore/QuartzCore.h>
 
 #pragma mark - 系统版本探测
 static inline BOOL SBP_iOS17OrLater(void) {
