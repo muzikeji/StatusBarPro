@@ -608,6 +608,14 @@ static void reloadPrefs() {
     [[SBPTimeLabel shared] refresh];
 }
 
+// 5) 注销：由设置面板按钮触发，SpringBoard 直接自杀。
+// 相比 sbreload/killall，这条路径不依赖任何外部工具，rootless/roothide 通用。
+static void sbpRespring(CFNotificationCenterRef center, void *observer,
+                        CFStringRef name, const void *object,
+                        CFDictionaryRef info) {
+    kill(getpid(), SIGKILL);
+}
+
 %ctor {
     // 图标 hook 在所有版本启用
     %init(SBPIcons);
@@ -628,6 +636,13 @@ static void reloadPrefs() {
         NULL,
         (CFNotificationCallback)(void (*)(CFNotificationCenterRef, void *, CFStringRef, const void *, CFDictionaryRef))&reloadPrefs,
         (CFStringRef)@"com.muzikeji.statusbarprefschanged",
+        NULL,
+        CFNotificationSuspensionBehaviorDeliverImmediately);
+
+    CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(),
+        NULL,
+        (CFNotificationCallback)&sbpRespring,
+        (CFStringRef)@"com.muzikeji.statusbarpro/respring",
         NULL,
         CFNotificationSuspensionBehaviorDeliverImmediately);
 

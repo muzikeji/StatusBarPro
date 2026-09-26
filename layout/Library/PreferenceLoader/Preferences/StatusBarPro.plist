@@ -7,10 +7,9 @@
         <key>bundle</key>
         <string>StatusBarProPrefs</string>
         <key>cell</key>
-        <dict>
-            <key>label</key>
-            <string>状态栏美化</string>
-        </dict>
+        <string>PSLinkCell</string>
+        <key>label</key>
+        <string>StatusBarPro</string>
     </dict>
 </dict>
 </plist>

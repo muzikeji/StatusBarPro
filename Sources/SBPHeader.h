@@ -3,6 +3,7 @@
 #import <Foundation/Foundation.h>
 #import <objc/runtime.h>
 #import <substrate.h>
+#import <signal.h>
 
 #pragma mark - Shared prefs key
 #define SBPPrefPath @"/var/mobile/Library/Preferences/com.muzikeji.statusbarpro.plist"

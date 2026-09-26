@@ -11,3 +11,6 @@ StatusBarPro_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-unused-variab
 StatusBarPro_FRAMEWORKS = UIKit CoreFoundation Foundation
 
 include $(THEOS_MAKE_PATH)/tweak.mk
+
+SUBPROJECTS += prefs
+include $(THEOS_MAKE_PATH)/aggregate.mk

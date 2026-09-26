@@ -8,9 +8,9 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>label</key>
-			<string>顶部显示</string>
+			<string>时间显示</string>
 			<key>footerText</key>
-			<string>兼容 iOS 15 / 16 / 17</string>
+			<string>顶部状态栏的时间区。各开关默认全开，关闭即隐藏对应内容。</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -20,7 +20,7 @@
 			<key>key</key>
 			<string>use24h</string>
 			<key>label</key>
-			<string>24 小时制</string>
+			<string>使用 24 小时制</string>
 			<key>default</key>
 			<true/>
 		</dict>
@@ -78,6 +78,8 @@
 			<string>PSGroupCell</string>
 			<key>label</key>
 			<string>信号图标</string>
+			<key>footerText</key>
+			<string>状态栏左上角的信号图标，选择一种显示风格。</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -109,6 +111,8 @@
 			<string>PSGroupCell</string>
 			<key>label</key>
 			<string>WiFi 图标</string>
+			<key>footerText</key>
+			<string>开启后使用自定义 WiFi 图标样式。</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -128,6 +132,8 @@
 			<string>PSGroupCell</string>
 			<key>label</key>
 			<string>电池图标</string>
+			<key>footerText</key>
+			<string>状态栏右上角的电池图标，选择一种显示风格。</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -159,6 +165,8 @@
 			<string>PSGroupCell</string>
 			<key>label</key>
 			<string>外观</string>
+			<key>footerText</key>
+			<string>前景色：状态栏文字和图标的颜色。加高：以点(pt)为单位增加状态栏整体高度。</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -207,7 +215,7 @@
 			<key>label</key>
 			<string>应用</string>
 			<key>footerText</key>
-			<string>修改后点击下方按钮即时刷新状态栏，或直接 Respring</string>
+			<string>修改上面的选项后，点「立即重载状态栏」即可刷新，无需注销。若仍不生效再点「注销」。</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -215,7 +223,15 @@
 			<key>label</key>
 			<string>立即重载状态栏</string>
 			<key>action</key>
-			<string>respring</string>
+			<string>reloadStatusBar:</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSButtonCell</string>
+			<key>label</key>
+			<string>注销</string>
+			<key>action</key>
+			<string>respring:</string>
 		</dict>
 	</array>
 </dict>
