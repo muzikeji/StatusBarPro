@@ -1,5 +1,19 @@
 #import "SBPHeader.h"
 #import "StatusBarProPrefs.h"
+#import <syslog.h>
+#import <stdarg.h>
+
+#pragma mark - 诊断日志 (Apple System Log, 终端 log stream 可查)
+// 所有诊断走 syslog, 不依赖设备端额外工具。查看方式:
+//   log stream --predicate 'eventMessage CONTAINS "SBP"' --style syslog
+static void SBPDiag(NSString *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    NSString *msg = [[NSString alloc] initWithFormat:fmt arguments:ap];
+    va_end(ap);
+    openlog("StatusBarPro", LOG_PID, LOG_DAEMON);
+    syslog(LOG_INFO, "%s", msg.UTF8String);
+}
 
 #pragma mark - 系统版本探测
 static inline BOOL SBP_iOS17OrLater(void) {
@@ -185,6 +199,49 @@ static void SBPApplyToTimeView(UILabel *tv) {
     tv.shadowColor = nil;
     // 防止系统 alternateText 定时器把文本换走 (仅 STUIStatusBarStringView 有该属性)
     @try { [tv setValue:nil forKey:@"alternateText"]; } @catch (NSException *e) {}
+}
+
+// 判断一个 UILabel 是否长着"时钟文本"的样子。系统状态栏时间形如
+// "9:41" / "09:41" / "09:41:07"; 已被我们改写后则含农历/换行特征。
+static BOOL SBPLooksLikeClockText(NSString *t) {
+    if (t.length < 3) return NO;
+    unichar c0 = [t characterAtIndex:0];
+    if (c0 < '0' || c0 > '9') return NO;
+    NSRange r = [t rangeOfString:@":"];
+    if (r.location == NSNotFound || r.location > 2) return NO;
+    NSInteger after = t.length - (r.location + 1);
+    if (after < 2) return NO;
+    unichar c1 = [t characterAtIndex:r.location + 1];
+    unichar c2 = [t characterAtIndex:r.location + 2];
+    if (c1 < '0' || c1 > '9') return NO;
+    if (c2 < '0' || c2 > '9') return NO;
+    return YES;
+}
+
+static BOOL SBPIsTimeCandidate(UILabel *tv) {
+    NSString *cn = NSStringFromClass([tv class]);
+    if (![cn containsString:@"String"]) return NO;
+    NSString *t = tv.text;
+    return SBPLooksLikeClockText(t) || [t containsString:@"农历"] || [t containsString:@"\n"];
+}
+
+// 兜底定位: 在 STUIStatusBar 视图树里找"像时钟的字符串 view"并应用。
+// 即使 STUIStatusBarTimeItem 的 applyUpdate: 没被触发, 每次 layoutSubviews
+// 都会重新扫一遍, 保证 gSBPTimeView 永远指向真实的 timeView。
+static void SBPFindTimeViews(UIView *view) {
+    for (UIView *sub in view.subviews) {
+        if ([sub isKindOfClass:[UILabel class]] && SBPIsTimeCandidate((UILabel *)sub)) {
+            static BOOL foundOnce = NO;
+            if (!foundOnce) {
+                foundOnce = YES;
+                SBPDiag(@"SBP found time view via tree walk: %@", NSStringFromClass([sub class]));
+            }
+            gSBPTimeView = (UILabel *)sub;
+            SBPApplyToTimeView((UILabel *)sub);
+            return;
+        }
+        SBPFindTimeViews(sub);
+    }
 }
 
 // 用户显式选择的前景色。白色 (FFFFFF) 是面板默认值, 视为不干预,
@@ -593,16 +650,20 @@ static void applyColorOverrides() {
 // 每次系统 update 都经过 applyUpdate:toDisplayItem:, 在 %orig 之后把
 // 时间 view 文本替换成自定义格式; 秒级刷新交给 %ctor 里的 1 秒 timer。
 %group SBP17Time
+static int gSBPApplyHits = 0;
 %hook STUIStatusBarTimeItem
 - (id)applyUpdate:(id)arg1 toDisplayItem:(id)arg2 {
     id result = %orig;
     @try {
         UILabel *tv = (UILabel *)[self performSelector:@selector(timeView)];
+        if (!gSBPApplyHits)
+            SBPDiag(@"SBP applyUpdate:toDisplayItem: hit for the first time, tv=%p", tv);
         if ([tv isKindOfClass:[UILabel class]]) {
             gSBPTimeView = tv;
             SBPApplyToTimeView(tv);
         }
     } @catch (NSException *e) {}
+    gSBPApplyHits++;
     return result;
 }
 %end
@@ -612,14 +673,33 @@ static void applyColorOverrides() {
 // (信号 activeColor、电池 body/fill/bolt、文本 textColor 都由它派生)。
 // 用户选了非默认前景色就强制覆盖, 默认白色则交回系统自动明暗。
 %group SBP17Color
+static int gSBPSetFgHits = 0;
 %hook STUIStatusBar
 - (void)setForegroundColor:(UIColor *)color {
+    if (!gSBPSetFgHits)
+        SBPDiag(@"SBP setForegroundColor: hit for the first time, incoming=%@", color);
+    gSBPSetFgHits++;
     UIColor *custom = SBPUserForegroundColor();
     %orig(custom ?: color);
 }
 - (void)layoutSubviews {
     %orig;
-    if (gSBPTimeView) SBPApplyToTimeView(gSBPTimeView);
+    SBPFindTimeViews(self);
+}
+%end
+
+// 兜底着色点: 每次系统刷新样式都会经过 applyStyleAttributes:,
+// 对时间 view 强制覆盖成用户色。比 setForegroundColor: 更靠近 UILabel,
+// 即使 setForegroundColor: 未被外部调用也能生效。
+%hook STUIStatusBarStringView
+- (void)applyStyleAttributes:(id)arg1 {
+    %orig;
+    if (SBPIsTimeCandidate(self)) {
+        UIColor *custom = SBPUserForegroundColor();
+        if (custom) self.textColor = custom;
+        gSBPTimeView = self;
+        SBPApplyToTimeView(self);
+    }
 }
 %end
 %end
@@ -640,6 +720,14 @@ static void sbpRespring(CFNotificationCenterRef center, void *observer,
 }
 
 %ctor {
+    // 注入确认: 这行能打出来就说明 dylib 已被 SpringBoard 加载并执行。
+    SBPDiag(@"SBP v1.0.5 injected into %@, iOS %@; STUIStatusBarTimeItem=%d STUIStatusBar=%d STUIStatusBarStringView=%d",
+        [NSProcessInfo processInfo].processName,
+        [UIDevice currentDevice].systemVersion,
+        NSClassFromString(@"STUIStatusBarTimeItem") != nil,
+        NSClassFromString(@"STUIStatusBar") != nil,
+        NSClassFromString(@"STUIStatusBarStringView") != nil);
+
     // iOS 16+ (STUIStatusBar 体系): 直接改写时间 view 文本 + 强制前景色
     if (SBP_iOS17OrLater()) {
         %init(SBP17Time);
