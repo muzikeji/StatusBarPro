@@ -11,6 +11,3 @@ StatusBarPro_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-unused-variab
 StatusBarPro_FRAMEWORKS = UIKit CoreFoundation CoreTelephony AVFoundation QuartzCore
 
 include $(THEOS_MAKE_PATH)/tweak.mk
-
-before-stage::
-    find $(STAGING_DIR)/usr/lib/TweakInject -name '*.plist' -delete || true
