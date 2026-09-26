@@ -486,10 +486,13 @@ static NSDictionary *parseNamedImage(NSString *name) {
 static void applyColorOverrides() {
     UIColor *fg = SBPForegroundColor();
 
-    UIStatusBarStyleRequest *req = [NSClassFromString(@"UIStatusBarStyleRequest") new];
+    // 必须用可变子类: UIStatusBarStyleRequest 的 foregroundColor 是只读,
+    // 对它调 setForegroundColor: 会产生 unrecognized selector 崩溃。
+    Class reqCls = NSClassFromString(@"NSMutableUIStatusBarStyleRequest");
+    if (!reqCls) return;
+    NSMutableUIStatusBarStyleRequest *req = [reqCls new];
     req.foregroundColor = fg;
-    req.backgroundColor = [UIColor clearColor];
-    if ([req respondsToSelector:@selector(setStyle:)]) req.style = 0;
+    if ([req respondsToSelector:@selector(setRequestedStyle:)]) req.requestedStyle = UIStatusBarStyleDefault;
 
     NSDictionary *overrides = SBP_iOS17OrLater()
         ? @{@"StyleOverrideRequests":[NSMutableArray arrayWithObject:req],

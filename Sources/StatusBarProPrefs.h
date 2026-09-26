@@ -12,11 +12,18 @@
 @end
 
 #pragma mark - Style Request
+// 真实 UIKit 类: UIStatusBarStyleRequest 的 foregroundColor 是只读的,
+// 可写属性在其可变子类 NSMutableUIStatusBarStyleRequest 上。
+// 对只读类调用 setter 会抛 unrecognized selector, 曾导致 SpringBoard
+// 崩溃进安全模式, 所以此处按真实接口声明, 代码里实例化可变子类。
 @interface UIStatusBarStyleRequest : NSObject
-@property(retain, nonatomic) UIColor *foregroundColor;
-@property(retain, nonatomic) UIColor *backgroundColor;
-@property(assign, nonatomic) long long style;       // iOS 17+
-@property(retain, nonatomic) NSNumber *styleOverride; // iOS 16+ fallback
+@property(nonatomic, readonly) UIColor *foregroundColor;
+@property(nonatomic, readonly) UIStatusBarStyle requestedStyle;
+@end
+
+@interface NSMutableUIStatusBarStyleRequest : UIStatusBarStyleRequest
+@property(nonatomic, retain) UIColor *foregroundColor;
+@property(nonatomic) UIStatusBarStyle requestedStyle;
 @end
 
 #pragma mark - Time / Battery / WiFi items
