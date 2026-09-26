@@ -407,7 +407,13 @@ static NSDictionary *parseNamedImage(NSString *name) {
         if (dual) {
             NSRegularExpression *r2 = [NSRegularExpression regularExpressionWithPattern:@"Left(\\d)|Right(\\d)" options:0 error:nil];
             NSTextCheckingResult *m2 = [r2 firstMatchInString:name options:0 range:NSMakeRange(0, name.length)];
-            if (m2) d[@"bars"] = @([[name substringWithRange:[m2 rangeAtIndex:1] ?: [m2 rangeAtIndex:2]].intValue);
+            if (m2) {
+                NSRange r1 = [m2 rangeAtIndex:1];
+                NSRange r2r = [m2 rangeAtIndex:2];
+                NSRange sel = (r1.location != NSNotFound) ? r1 : r2r;
+                if (sel.location != NSNotFound)
+                    d[@"bars"] = @([[name substringWithRange:sel] intValue]);
+            }
         }
         return d;
     }
