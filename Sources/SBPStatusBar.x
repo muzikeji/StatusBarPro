@@ -117,12 +117,6 @@ static void solarToLunar(int y, int m, int d, int *ly, int *lm, int *ld) {
     *ld = lDay;
 }
 
-    // 输出：闰月以负号标记在 lm (例如闰四月 = -4)
-    *ly = lYear;
-    *lm = isLeap ? -lMonth : lMonth;
-    *ld = lDay;
-}
-
 // 生肖（按农历年）
 static NSString *lunarZodiac(int ly) {
     if (ly < 0) return @"";
