@@ -10,8 +10,7 @@
 static inline id SBPGetPref(NSString *key) {
     NSDictionary *d = [NSDictionary dictionaryWithContentsOfFile:SBPPrefPath];
     if (!d) return nil;
-    id v = d[key];
-    return v;
+    return d[key];
 }
 
 static inline void SBPSetPref(NSString *key, id value) {
@@ -19,13 +18,3 @@ static inline void SBPSetPref(NSString *key, id value) {
     d[key] = value;
     [d writeToFile:SBPPrefPath atomically:YES];
 }
-
-// 前向声明, 配合 PSListController
-@interface PSSpecifier : NSObject
-- (id)propertyForKey:(NSString *)key;
-@end
-
-@interface PSListController : UIViewController
-- (id)readPreferenceValue:(PSSpecifier *)specifier;
-- (void)setPreferenceValue:(id)value specifier:(PSSpecifier *)specifier;
-@end
