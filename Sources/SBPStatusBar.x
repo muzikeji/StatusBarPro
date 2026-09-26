@@ -130,55 +130,21 @@ static NSString *lunarZodiac(int ly) {
     return zodiac[idx];
 }
 
-#pragma mark - 自定义时钟 Label
-@interface SBPTimeLabel : UILabel
-+ (instancetype)shared;
-- (void)refresh;
-- (void)refreshAnimated:(BOOL)animated;
-@end
+#pragma mark - 自定义时间文本
+// iOS 16+ 直接改写系统时间 Label (STUIStatusBarTimeItem.timeView),
+// iOS 15 及以下仍用覆盖层 SBPTimeLabel。文本生成逻辑统一在这里。
+static UIColor *SBPForegroundColor(void);   // 前向声明, 定义见下方
 
-static NSTimer *gTimer = nil;
+static __weak UILabel *gSBPTimeView = nil;
 
-@implementation SBPTimeLabel {
-    NSCalendar *_cal;
-    NSDateComponents *_prev;
-}
-+ (instancetype)shared {
-    static SBPTimeLabel *s;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{ s = [SBPTimeLabel new]; });
-    return s;
-}
-- (instancetype)init {
-    if ((self = [super init])) {
-        _cal = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
-        _prev = nil;
-        self.font = [UIFont monospacedDigitSystemFontOfSize:13 weight:UIFontWeightSemibold];
-        self.textColor = [UIColor whiteColor];
-        self.textAlignment = NSTextAlignmentCenter;
-        self.adjustsFontSizeToFitWidth = YES;
-        self.minimumScaleFactor = 0.7;
-        self.numberOfLines = 2;
-        [self refresh];
-        if (!gTimer) {
-            gTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer *_) {
-                [[SBPTimeLabel shared] refreshAnimated:YES];
-            }];
-        }
-    }
-    return self;
-}
-
-- (void)refresh { [self refreshAnimated:NO]; }
-
-- (void)refreshAnimated:(BOOL)animated {
+static NSString *SBPComposeTimeText(void) {
     NSDate *now = [NSDate date];
-    NSDateComponents *c = [_cal components:
+    NSCalendar *cal = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
+    NSDateComponents *c = [cal components:
         NSCalendarUnitYear|NSCalendarUnitMonth|NSCalendarUnitDay|
         NSCalendarUnitWeekday|NSCalendarUnitHour|NSCalendarUnitMinute|NSCalendarUnitSecond
         fromDate:now];
 
-    // 时间
     BOOL use24 = [SBPGetPref(@"use24h") boolValue];
     int h = c.hour;
     if (!use24) h = h % 12 ?: 12;
@@ -187,50 +153,91 @@ static NSTimer *gTimer = nil;
         ? [NSString stringWithFormat:@"%02d:%02d:%02d", h, (int)c.minute, (int)c.second]
         : [NSString stringWithFormat:@"%02d:%02d", h, (int)c.minute];
 
-    BOOL showDate = [SBPGetPref(@"showDate") boolValue];
-    NSString *dateText = showDate
-        ? [NSString stringWithFormat:@"%04d-%02d-%02d", (int)c.year, (int)c.month, (int)c.day]
-        : @"";
-
-    BOOL showWeek = [SBPGetPref(@"showWeekday") boolValue];
-    NSString *weekText = showWeek
-        ? [NSString stringWithFormat:@"周%@", [@"日一二三四五六" substringWithRange:NSMakeRange(c.weekday-1, 1)]]
-        : @"";
-
-    BOOL showLunar = [SBPGetPref(@"showLunar") boolValue];
-    NSString *lunarText = @"";
-    if (showLunar) {
+    NSMutableArray *parts = [NSMutableArray array];
+    if ([SBPGetPref(@"showDate") boolValue])
+        [parts addObject:[NSString stringWithFormat:@"%04d-%02d-%02d", (int)c.year, (int)c.month, (int)c.day]];
+    if ([SBPGetPref(@"showWeekday") boolValue])
+        [parts addObject:[NSString stringWithFormat:@"周%@", [@"日一二三四五六" substringWithRange:NSMakeRange(c.weekday - 1, 1)]]];
+    if ([SBPGetPref(@"showLunar") boolValue]) {
         int ly, lm, ld;
         solarToLunar((int)c.year, (int)c.month, (int)c.day, &ly, &lm, &ld);
         BOOL isLeapM = (lm < 0);
         int lMonth = isLeapM ? -lm : lm;
-        NSString *zodiac = lunarZodiac(ly);
-        NSString *leapPrefix = isLeapM ? @"闰" : @"";
-        lunarText = [NSString stringWithFormat:@"农历%@%@%d月%@", zodiac, leapPrefix, lMonth, chineseDay(ld)];
+        [parts addObject:[NSString stringWithFormat:@"农历%@%@%d月%@",
+                          lunarZodiac(ly), isLeapM ? @"闰" : @"", lMonth, chineseDay(ld)]];
     }
+    NSString *line2 = [parts componentsJoinedByString:@"  "];
+    return line2.length ? [NSString stringWithFormat:@"%@\n%@", timeText, line2] : timeText;
+}
 
-    NSString *sep = @"  ";
-    NSString *line1 = timeText;
-    NSMutableArray *parts = [NSMutableArray array];
-    if (dateText.length) [parts addObject:dateText];
-    if (weekText.length) [parts addObject:weekText];
-    if (lunarText.length) [parts addObject:lunarText];
-    NSString *line2 = [parts componentsJoinedByString:sep];
+// 把自定义时间文本/字体应用到任意 UILabel (iOS 16+ 的 timeView)。
+static void SBPApplyToTimeView(UILabel *tv) {
+    if (!tv) return;
+    NSString *text = SBPComposeTimeText();
+    if (![tv.text isEqualToString:text]) tv.text = text;
+    tv.font = [UIFont monospacedDigitSystemFontOfSize:13 weight:UIFontWeightSemibold];
+    tv.textColor = SBPForegroundColor();
+    tv.textAlignment = NSTextAlignmentCenter;
+    tv.numberOfLines = 2;
+    tv.adjustsFontSizeToFitWidth = YES;
+    tv.minimumScaleFactor = 0.6;
+    tv.backgroundColor = [UIColor clearColor];
+    tv.shadowColor = nil;
+    // 防止系统 alternateText 定时器把文本换走 (仅 STUIStatusBarStringView 有该属性)
+    @try { [tv setValue:nil forKey:@"alternateText"]; } @catch (NSException *e) {}
+}
 
-    NSString *combined = line2.length
-        ? [NSString stringWithFormat:@"%@\n%@", line1, line2]
-        : line1;
-
-    BOOL changed = !_prev
-        || _prev.hour != c.hour || _prev.minute != c.minute || _prev.second != c.second
-        || _prev.day != c.day || _prev.month != c.month || _prev.year != c.year;
-
-    if (changed) self.text = combined;
-    _prev = c;
-
-    if (animated) {
-        // 让系统自动处理 layout
+// 用户显式选择的前景色。白色 (FFFFFF) 是面板默认值, 视为不干预,
+// 让系统按背景自动切换前景色; 其他颜色则强制覆盖。
+static UIColor *SBPUserForegroundColor(void) {
+    NSString *hex = SBPGetPref(@"foregroundColor");
+    if ([hex isKindOfClass:[NSString class]] && hex.length > 0) {
+        if ([hex hasPrefix:@"#"]) hex = [hex substringFromIndex:1];
+        unsigned int v = 0;
+        NSScanner *s = [NSScanner scannerWithString:hex];
+        if ([s scanHexInt:&v] && (v <= 0xFFFFFF) && (v != 0xFFFFFF)) {
+            return [UIColor colorWithRed:((v >> 16) & 0xFF) / 255.0
+                                   green:((v >> 8) & 0xFF) / 255.0
+                                    blue:(v & 0xFF) / 255.0
+                                   alpha:1.0];
+        }
     }
+    return nil;
+}
+
+#pragma mark - 自定义时钟 Label (iOS 15 及以下覆盖层)
+@interface SBPTimeLabel : UILabel
++ (instancetype)shared;
+- (void)refresh;
+- (void)refreshAnimated:(BOOL)animated;
+@end
+
+static NSTimer *gTimer = nil;
+
+@implementation SBPTimeLabel
++ (instancetype)shared {
+    static SBPTimeLabel *s;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ s = [SBPTimeLabel new]; });
+    return s;
+}
+- (instancetype)init {
+    if ((self = [super init])) {
+        self.font = [UIFont monospacedDigitSystemFontOfSize:13 weight:UIFontWeightSemibold];
+        self.textColor = [UIColor whiteColor];
+        self.textAlignment = NSTextAlignmentCenter;
+        self.adjustsFontSizeToFitWidth = YES;
+        self.minimumScaleFactor = 0.7;
+        self.numberOfLines = 2;
+        [self refresh];
+    }
+    return self;
+}
+
+- (void)refresh { [self refreshAnimated:NO]; }
+
+- (void)refreshAnimated:(BOOL)animated {
+    self.text = SBPComposeTimeText();
 }
 
 - (CGSize)intrinsicContentSize {
@@ -532,32 +539,10 @@ static void applyColorOverrides() {
 %end
 %end
 
-// iOS 17 新增 UIStatusBarTimeContainerView, 包裹一个 UIStatusBarTimeItemView
-%group SBPNewTime
-%hook UIStatusBarTimeContainerView
-- (void)didMoveToWindow {
-    %orig;
-    if (self.window) [self sbpinstallTimeLabel];
-}
-%new(v@:@)
-- (void)sbpinstallTimeLabel {
-    UIView *child = [self performSelector:@selector(timeView)]; // UIStatusBarTimeItemView
-    if ([child isKindOfClass:[UIView class]]) {
-        SBPTimeLabel *lbl = [SBPTimeLabel shared];
-        if (!lbl.superview) [child addSubview:lbl];
-        lbl.translatesAutoresizingMaskIntoConstraints = NO;
-        [NSLayoutConstraint activateConstraints:@[
-            [lbl.leadingAnchor constraintEqualToAnchor:child.leadingAnchor],
-            [lbl.trailingAnchor constraintEqualToAnchor:child.trailingAnchor],
-            [lbl.topAnchor constraintEqualToAnchor:child.topAnchor],
-            [lbl.bottomAnchor constraintEqualToAnchor:child.bottomAnchor],
-        ]];
-    }
-}
-%end
-%end
+// iOS 17 时间容器是 STUIStatusBarTimeItem 体系的 STUIStatusBarStringView,
+// 不再存在 UIStatusBarTimeContainerView, 对应 hook 移到 SBP17Time。
 
-// 2) 图标重绘 (所有版本通用)
+// 2) 图标重绘 (仅 iOS 15 及以下)
 %group SBPIcons
 %hook UIStatusBarImageView
 - (UIImage *)image {
@@ -602,10 +587,48 @@ static void applyColorOverrides() {
 %end
 %end
 
-// 4) prefs 变化回调
+// 3) iOS 16+ (STUIStatusBar 体系): 时间显示
+// SpringBoard 顶部状态栏时间 = STUIStatusBarTimeItem.timeView
+// (一个 STUIStatusBarStringView, UILabel 子类)。
+// 每次系统 update 都经过 applyUpdate:toDisplayItem:, 在 %orig 之后把
+// 时间 view 文本替换成自定义格式; 秒级刷新交给 %ctor 里的 1 秒 timer。
+%group SBP17Time
+%hook STUIStatusBarTimeItem
+- (id)applyUpdate:(id)arg1 toDisplayItem:(id)arg2 {
+    id result = %orig;
+    @try {
+        UILabel *tv = (UILabel *)[self performSelector:@selector(timeView)];
+        if ([tv isKindOfClass:[UILabel class]]) {
+            gSBPTimeView = tv;
+            SBPApplyToTimeView(tv);
+        }
+    } @catch (NSException *e) {}
+    return result;
+}
+%end
+%end
+
+// 4) iOS 16+ 前景色: STUIStatusBar.foregroundColor 是所有 glyph 颜色来源
+// (信号 activeColor、电池 body/fill/bolt、文本 textColor 都由它派生)。
+// 用户选了非默认前景色就强制覆盖, 默认白色则交回系统自动明暗。
+%group SBP17Color
+%hook STUIStatusBar
+- (void)setForegroundColor:(UIColor *)color {
+    UIColor *custom = SBPUserForegroundColor();
+    %orig(custom ?: color);
+}
+- (void)layoutSubviews {
+    %orig;
+    if (gSBPTimeView) SBPApplyToTimeView(gSBPTimeView);
+}
+%end
+%end
+
+// 5) prefs 变化回调
 static void reloadPrefs() {
-    applyColorOverrides();
+    if (!SBP_iOS17OrLater()) applyColorOverrides();
     [[SBPTimeLabel shared] refresh];
+    if (gSBPTimeView) SBPApplyToTimeView(gSBPTimeView);
 }
 
 // 5) 注销：由设置面板按钮触发，SpringBoard 直接自杀。
@@ -617,15 +640,24 @@ static void sbpRespring(CFNotificationCenterRef center, void *observer,
 }
 
 %ctor {
-    // 图标 hook 在所有版本启用
-    %init(SBPIcons);
-
-    // 按系统版本启用不同 group
+    // iOS 16+ (STUIStatusBar 体系): 直接改写时间 view 文本 + 强制前景色
     if (SBP_iOS17OrLater()) {
-        %init(SBPNewTime);
+        %init(SBP17Time);
+        %init(SBP17Color);
     } else {
+        // iOS 15 及以下老架构: 覆盖层 label + 图标重绘 + frame 加高
+        %init(SBPIcons);
         %init(SBPLegacyTime);
         %init(SBP15_16);
+        applyColorOverrides();
+    }
+
+    // 秒级刷新: 老架构的覆盖层 label 与 16+ 的时间 view 共用同一计时器
+    if (!gTimer) {
+        gTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer *_) {
+            if (gSBPTimeView) SBPApplyToTimeView(gSBPTimeView);
+            [[SBPTimeLabel shared] refresh];
+        }];
     }
 
     NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
@@ -645,6 +677,4 @@ static void sbpRespring(CFNotificationCenterRef center, void *observer,
         (CFStringRef)@"com.muzikeji.statusbarpro/respring",
         NULL,
         CFNotificationSuspensionBehaviorDeliverImmediately);
-
-    applyColorOverrides();
 }

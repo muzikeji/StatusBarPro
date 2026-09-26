@@ -1,6 +1,6 @@
 Package: com.muzikeji.statusbarpro
 Name: StatusBarPro
-Version: 1.0.3
+Version: 1.0.4
 Architecture: iphoneos-arm64
 Description: 状态栏美化: 自定义时间/日期/农历, 信号图标美化.
 Maintainer: muzikeji

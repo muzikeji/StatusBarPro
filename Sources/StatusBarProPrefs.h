@@ -82,3 +82,60 @@
 
 // iOS 17+: per-pixel layout
 @interface UIStatusBarInternalLayoutManager : NSObject @end
+
+#pragma mark - iOS 16/17 SpringBoard: STUIStatusBar* (SystemStatusUI.framework)
+// class-dump 自 iOS 17 真机 (MTACS/iOS-17-Runtime-Headers)。
+// SpringBoard 顶部状态栏从 iOS 16 起改用 STUI 体系, iOS 15 及以下才是
+// UIStatusBarTimeItemView/UIStatusBarImageView 那套老类。
+@protocol STUIStatusBarDisplayable <NSObject> @end
+
+@interface STUIStatusBarItem : NSObject
+- (id)applyUpdate:(id)arg1 toDisplayItem:(id)arg2;
+@end
+
+@interface STUIStatusBarTimeItem : STUIStatusBarItem
+@property(nonatomic, retain) STUIStatusBarStringView *dateView;
+@property(nonatomic, retain) STUIStatusBarStringView *pillTimeView;
+@property(nonatomic, retain) STUIStatusBarStringView *shortTimeView;
+@property(nonatomic, retain) STUIStatusBarStringView *timeView;
+@end
+
+@interface STUIStatusBarStringView : UILabel
+@property(nonatomic, copy) NSString *alternateText;
+@property(nonatomic, readonly) NSTimer *alternateTextTimer;
+@property(nonatomic) long long fontStyle;
+@property(nonatomic, copy) NSString *originalText;
+@property(nonatomic) bool showsAlternateText;
+- (void)applyStyleAttributes:(id)arg1;
+- (void)didMoveToWindow;
+@end
+
+@interface STUIStatusBarSignalView : UIView
+@property(nonatomic, copy) UIColor *activeColor;
+@property(nonatomic) long long iconSize;
+@property(nonatomic, copy) UIColor *inactiveColor;
+@property(nonatomic) long long numberOfActiveBars;
+@property(nonatomic) long long numberOfBars;
+@property(nonatomic) long long signalMode;
+@property(nonatomic) bool smallSize;
+- (void)_updateBars;
+- (void)_colorsDidChange;
+@end
+
+@interface STUIStatusBarCellularSignalView : STUIStatusBarSignalView @end
+@interface STUIStatusBarWifiSignalView : STUIStatusBarSignalView @end
+
+@interface STUIStatusBarBatteryView : UIView
+@property(nonatomic, copy) UIColor *bodyColor;
+@property(nonatomic, copy) UIColor *fillColor;
+@property(nonatomic, copy) UIColor *boltColor;
+@property(nonatomic, copy) UIColor *pinColor;
+@property(nonatomic, copy) UIColor *inactiveColor;
+@end
+
+@interface STUIStatusBar : UIView
+@property(nonatomic, copy) UIColor *foregroundColor;
+@property(nonatomic, retain) UIView *foregroundView;
+- (void)setForegroundColor:(UIColor *)color;
+- (void)layoutSubviews;
+@end
