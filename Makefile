@@ -8,6 +8,6 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = StatusBarPro
 StatusBarPro_FILES = Sources/SBPStatusBar.x
 StatusBarPro_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-unused-variable -Wno-unused-function
-StatusBarPro_FRAMEWORKS = UIKit CoreFoundation
+StatusBarPro_FRAMEWORKS = UIKit CoreFoundation Foundation
 
 include $(THEOS_MAKE_PATH)/tweak.mk

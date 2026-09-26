@@ -5,13 +5,6 @@
 static inline BOOL SBP_iOS17OrLater(void) {
     return [[[UIDevice currentDevice] systemVersion] floatValue] >= 17.0;
 }
-static inline BOOL SBP_iOS16OrLater(void) {
-    return [[[UIDevice currentDevice] systemVersion] floatValue] >= 16.0;
-}
-static inline BOOL SBP_iOS15(void) {
-    NSString *v = [[UIDevice currentDevice] systemVersion];
-    return [v hasPrefix:@"15."];
-}
 
 #pragma mark - 农历查表 (2000-2099)
 // 每个 uint32_t 编码该年信息:
@@ -44,7 +37,6 @@ static const uint32_t kLunarInfo[] = {
 #define LUNAR_YEAR_MIN 2000
 #define LUNAR_YEAR_MAX 2199
 
-static BOOL lunarInRange(int y) { return y >= LUNAR_YEAR_MIN && y <= LUNAR_YEAR_MAX; }
 static uint32_t lunarInfo(int y) { return kLunarInfo[y - LUNAR_YEAR_MIN]; }
 
 static int lunarLeapMonth(int y) { return lunarInfo(y) >> 16; }
@@ -74,40 +66,74 @@ static NSString *chineseDay(int d) {
 }
 
 static void solarToLunar(int y, int m, int d, int *ly, int *lm, int *ld) {
-    // 计算与 1900-01-31 (农历 1900-01-01) 的天数差
+    // 农历基准：1900-01-31 = 农历 1900-01-01
     int daysFromBase = 0;
     for (int yy = 1900; yy < y; yy++)
         daysFromBase += (yy%4==0 && yy%100!=0) || yy%400==0 ? 366 : 365;
-    int mdays[]={31,28,31,30,31,30,31,31,30,31,30,31};
+    int mdays[12]={31,28,31,30,31,30,31,31,30,31,30,31};
     if (((y%4==0) && (y%100!=0)) || (y%400==0)) mdays[1]=29;
     for (int mm = 1; mm < m; mm++) daysFromBase += mdays[mm-1];
     daysFromBase += d - 31;
 
     int lYear = 1900, lMonth = 1, lDay = 1;
-    int yearDays = lunarYearDays(lYear);
-    while (lYear < 2200 && daysFromBase >= yearDays) {
-        daysFromBase -= yearDays;
+    while (daysFromBase > 0) {
+        int yd = lunarYearDays(lYear);
+        if (daysFromBase < yd) break;
+        daysFromBase -= yd;
         lYear++;
-        yearDays = lunarYearDays(lYear);
     }
+
     int leap = lunarLeapMonth(lYear);
-    while (1) {
-        int monthDays = lunarMonthDays(lYear, lMonth);
-        if (lMonth > 12 && daysFromBase < monthDays) break;
-        if (daysFromBase < monthDays) break;
-        daysFromBase -= monthDays;
-        lMonth++;
-        if (lMonth == leap + 1 && lMonth <= 12 && leap > 0) {
-            // 跨过闰月 - 标记成闰月
+    BOOL isLeap = NO;
+    while (daysFromBase > 0) {
+        int md;
+        if (isLeap) {
+            md = lunarLeapBig(lYear) ? 30 : 29;
+        } else {
+            md = lunarMonthDays(lYear, lMonth);
         }
-        if (lMonth > 13) { lYear++; lMonth = 1; leap = lunarLeapMonth(lYear); }
+        if (daysFromBase < md) break;
+        daysFromBase -= md;
+
+        if (isLeap) {
+            isLeap = NO;      // 闰月消费完，回到下一个月
+            lMonth++;
+        } else if (leap > 0 && lMonth == leap) {
+            isLeap = YES;     // 下一个是闰月
+        } else {
+            lMonth++;
+        }
+        if (!isLeap && lMonth > 12) {
+            lMonth = 1;
+            lYear++;
+            leap = lunarLeapMonth(lYear);
+        }
     }
     lDay += daysFromBase;
-    if (lDay > lunarMonthDays(lYear, lMonth)) {
-        lDay = lDay - lunarMonthDays(lYear, lMonth);
-        lMonth++;
-    }
-    *ly = lYear; *lm = lMonth; *ld = lDay;
+
+    // 输出：闰月以负号标记在 lm (例如闰四月 = -4)
+    *ly = lYear;
+    *lm = isLeap ? -lMonth : lMonth;
+    *ld = lDay;
+}
+
+    // 输出：闰月以负号标记在 lm (例如闰四月 = -4)
+    *ly = lYear;
+    *lm = isLeap ? -lMonth : lMonth;
+    *ld = lDay;
+}
+
+// 生肖（按农历年）
+static NSString *lunarZodiac(int ly) {
+    if (ly < 0) return @"";
+    static NSString *zodiac[] = {
+        @"鼠",@"牛",@"虎",@"兔",@"龙",@"蛇",@"马",
+        @"羊",@"猴",@"鸡",@"狗",@"猪"
+    };
+    // 1984 = 鼠年
+    int idx = (ly - 1984) % 12;
+    if (idx < 0) idx += 12;
+    return zodiac[idx];
 }
 
 #pragma mark - 自定义时钟 Label
@@ -181,9 +207,12 @@ static NSTimer *gTimer = nil;
     NSString *lunarText = @"";
     if (showLunar) {
         int ly, lm, ld;
-        solarToLunar(c.year, c.month, c.day, &ly, &lm, &ld);
-        NSString *yearZ = (ly == 2024) ? @"龙" : (ly == 2025) ? @"蛇" : (ly == 2026) ? @"马" : @"";
-        lunarText = [NSString stringWithFormat:@"农历%@%d月%@", yearZ, lm, chineseDay(ld)];
+        solarToLunar((int)c.year, (int)c.month, (int)c.day, &ly, &lm, &ld);
+        BOOL isLeapM = (lm < 0);
+        int lMonth = isLeapM ? -lm : lm;
+        NSString *zodiac = lunarZodiac(ly);
+        NSString *leapPrefix = isLeapM ? @"闰" : @"";
+        lunarText = [NSString stringWithFormat:@"农历%@%@%d月%@", zodiac, leapPrefix, lMonth, chineseDay(ld)];
     }
 
     NSString *sep = @"  ";
@@ -220,6 +249,24 @@ static NSTimer *gTimer = nil;
 }
 @end
 
+#pragma mark - 前景色工具
+static UIColor *SBPForegroundColor(void) {
+    NSString *hex = SBPGetPref(@"foregroundColor");
+    if ([hex isKindOfClass:[NSString class]] && hex.length > 0) {
+        // 去掉可能存在的 # 前缀
+        if ([hex hasPrefix:@"#"]) hex = [hex substringFromIndex:1];
+        unsigned int v = 0;
+        NSScanner *s = [NSScanner scannerWithString:hex];
+        if ([s scanHexInt:&v] && (v <= 0xFFFFFF)) {
+            return [UIColor colorWithRed:((v>>16)&0xFF)/255.0
+                                   green:((v>>8)&0xFF)/255.0
+                                    blue:(v&0xFF)/255.0
+                                   alpha:1.0];
+        }
+    }
+    return [UIColor whiteColor];
+}
+
 #pragma mark - 矢量绘图工具
 static UIImage *SBPImageFromBlock(CGSize size, void(^draw)(CGContextRef)) {
     UIGraphicsBeginImageContextWithOptions(size, NO, [[UIScreen mainScreen] scale]);
@@ -238,8 +285,7 @@ static UIImage *signalImageWithBars(NSInteger bars, NSInteger style, BOOL isDual
     CGFloat totalH = 10;
     CGSize size = CGSizeMake(totalW, totalH);
 
-    UIColor *tint = [SBPGetPref(@"foregroundColor") isKindOfClass:[NSString class]]
-        ? [UIColor whiteColor] : [UIColor whiteColor];
+    UIColor *tint = SBPForegroundColor();
 
     return SBPImageFromBlock(size, ^(CGContextRef ctx) {
         CGFloat maxH = totalH;
@@ -295,7 +341,7 @@ static UIImage *wifiImageWithStrength(NSInteger bars, NSInteger style) {
     CGSize size = CGSizeMake(w, h);
 
     return SBPImageFromBlock(size, ^(CGContextRef ctx) {
-        UIColor *tint = [UIColor whiteColor];
+        UIColor *tint = SBPForegroundColor();
         // 三道弧 + 中心点
         CGFloat cx = w / 2;
         CGFloat cy = h - 1.2;
@@ -322,8 +368,8 @@ static UIImage *wifiImageWithStrength(NSInteger bars, NSInteger style) {
 static UIImage *batteryImageWithLevel(CGFloat level, BOOL charging, NSInteger style) {
     CGFloat w = 24, h = 11;
     CGSize size = CGSizeMake(w, h);
-    UIColor *tint = [UIColor whiteColor];
-    UIColor *bg   = [UIColor colorWithWhite:1 alpha:0.18];
+    UIColor *tint = SBPForegroundColor();
+    UIColor *bg   = [tint colorWithAlphaComponent:0.18];
 
     return SBPImageFromBlock(size, ^(CGContextRef ctx) {
         CGRect body = CGRectMake(0.5, 0.5, w - 2.5, h - 1);
@@ -348,10 +394,10 @@ static UIImage *batteryImageWithLevel(CGFloat level, BOOL charging, NSInteger st
 
         // 内填充
         CGRect inner = CGRectInset(body, 1.0, 1.0);
-        inner.size.width *= MAX(0.0, MIN(1.0, level / 100.0));
-        UIColor *fillColor = (level <= 20) ? [UIColor systemRedColor]
-                            : (level <= 100) ? [UIColor whiteColor]
-                            : [UIColor whiteColor];
+        if (inner.size.width > 0) {
+            inner.size.width *= MAX(0.0, MIN(1.0, level / 100.0));
+        }
+        UIColor *fillColor = (level <= 20) ? [UIColor systemRedColor] : tint;
         CGPathRef fill = [[UIBezierPath bezierPathWithRoundedRect:inner cornerRadius:1.0] CGPath];
         CGContextSetFillColorWithColor(ctx, fillColor.CGColor);
         CGContextAddPath(ctx, fill);
@@ -359,7 +405,7 @@ static UIImage *batteryImageWithLevel(CGFloat level, BOOL charging, NSInteger st
 
         // 充电闪电
         if (charging) {
-            CGContextSetFillColorWithColor(ctx, [UIColor whiteColor].CGColor);
+            CGContextSetFillColorWithColor(ctx, tint.CGColor);
             UIBezierPath *bolt = [UIBezierPath bezierPath];
             [bolt moveToPoint:CGPointMake(body.size.width * 0.5 - 1.2, body.size.height * 0.25)];
             [bolt addLineToPoint:CGPointMake(body.size.width * 0.5 + 0.4, body.size.height * 0.5 - 0.5)];
@@ -444,13 +490,7 @@ static NSDictionary *parseNamedImage(NSString *name) {
 
 #pragma mark - 状态栏样式 / 颜色
 static void applyColorOverrides() {
-    UIColor *fg = [UIColor whiteColor];
-    NSString *hex = SBPGetPref(@"foregroundColor");
-    if ([hex isKindOfClass:[NSString class]] && hex.length > 0) {
-        unsigned int v = 0;
-        [[NSScanner scannerWithString:hex] scanHexInt:&v];
-        fg = [UIColor colorWithRed:((v>>16)&0xFF)/255.0 green:((v>>8)&0xFF)/255.0 blue:(v&0xFF)/255.0 alpha:1.0];
-    }
+    UIColor *fg = SBPForegroundColor();
 
     UIStatusBarStyleRequest *req = [NSClassFromString(@"UIStatusBarStyleRequest") new];
     req.foregroundColor = fg;
@@ -472,6 +512,10 @@ static void applyColorOverrides() {
 //    iOS 17 引入了 UIStatusBarTimeContainerView 包裹, 同时 hook
 %group SBPLegacyTime
 %hook UIStatusBarTimeItemView
+- (void)didMoveToWindow {
+    %orig;
+    if (self.window) [self sbpinstallTimeLabel];
+}
 %new(v@:@)
 - (void)sbpinstallTimeLabel {
     SBPTimeLabel *lbl = [SBPTimeLabel shared];
@@ -494,6 +538,10 @@ static void applyColorOverrides() {
 // iOS 17 新增 UIStatusBarTimeContainerView, 包裹一个 UIStatusBarTimeItemView
 %group SBPNewTime
 %hook UIStatusBarTimeContainerView
+- (void)didMoveToWindow {
+    %orig;
+    if (self.window) [self sbpinstallTimeLabel];
+}
 %new(v@:@)
 - (void)sbpinstallTimeLabel {
     UIView *child = [self performSelector:@selector(timeView)]; // UIStatusBarTimeItemView
@@ -530,6 +578,7 @@ static void applyColorOverrides() {
         return signalImageWithBars(bars, sigStyle, dual, NO);
     }
     if ([kind isEqualToString:@"wifi"]) {
+        if (![SBPGetPref(@"wifiCustom") boolValue]) return %orig;
         NSInteger bars = [parsed[@"bars"] integerValue];
         return wifiImageWithStrength(bars, wifiStyle);
     }

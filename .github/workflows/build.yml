@@ -19,12 +19,10 @@ jobs:
       - name: Install build prerequisites
         run: |
           brew install ldid xz
-          sudo xcode-select --switch /Applications/Xcode_15.4.app 2>/dev/null || true
-
-      - name: Choose Xcode version compatible with Swift toolchain
-        run: |
-          # Theos 要求与 TARGET (iphone:clang:latest:15.5) 匹配的 Xcode 新版本 SDK
-          sudo xcode-select -s /Applications/Xcode_15.2.app || sudo xcode-select -s /Applications/Xcode_15.4.app || true
+          # 用含 iOS 15 SDK 的 Xcode（与 TARGET:latest:15.5 匹配）
+          sudo xcode-select --switch /Applications/Xcode_15.2.app 2>/dev/null \
+            || sudo xcode-select --switch /Applications/Xcode_15.4.app 2>/dev/null \
+            || true
 
       - name: Bootstrap Theos
         run: |
