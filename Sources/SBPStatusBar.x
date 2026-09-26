@@ -63,8 +63,8 @@ static int lunarYearDays(int y) {
 }
 
 static NSString *chineseDay(int d) {
-    static NSString *tian[] = {"初","十","廿","三十"};
-    static NSString *di[]   = {"","一","二","三","四","五","六","七","八","九"};
+    static NSString *tian[] = {@"初",@"十",@"廿",@"三十"};
+    static NSString *di[]   = {@"",@"一",@"二",@"三",@"四",@"五",@"六",@"七",@"八",@"九"};
     if (d == 10) return @"初十";
     if (d == 20) return @"二十";
     if (d == 30) return @"三十";
