@@ -1,0 +1,21 @@
+# Build artifacts
+*.deb
+*.dylib
+*.so
+packages/
+.theos/
+.build/
+obj/
+sys/
+mnt/
+.layout/
+
+# Xcode / macOS
+.DS_Store
+build/
+DerivedData/
+
+# Editor
+*.xcuserstate
+.idea/
+.vscode/
