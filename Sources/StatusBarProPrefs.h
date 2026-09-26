@@ -26,11 +26,13 @@
 @interface UIStatusBarTimeItemView : UIView
 - (void)refreshTimeEntry;
 - (CGSize)sizeThatFits:(CGSize)size;
+- (void)sbpinstallTimeLabel;
 @end
 
 // iOS 16+ new container for time
 @interface UIStatusBarTimeContainerView : UIView
 @property(retain, nonatomic) UIView *timeView;     // UIStatusBarTimeItemView
+- (void)sbpinstallTimeLabel;
 @end
 
 // iOS 17+ uses a wrapper UIStatusBarItemView
